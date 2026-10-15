@@ -1,17 +1,19 @@
 use std::collections::HashSet;
 use std::ffi::OsString;
+use std::io::BufRead;
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::CommandFactory;
+use tracing::trace;
 use cot::metadata::{ArgMeta, CommandMeta};
 use cot::utils::cli::{StatusType, print_status_msg};
 
 use crate::args::{
     Cli, CompletionsArgs, ManpagesArgs, MigrationListArgs, MigrationMakeArgs, MigrationNewArgs,
-    ProjectNewArgs,
+    ProjectNewArgs, ModelArgs, ControllerArgs,
 };
 use crate::migration_generator::{
     MigrationGeneratorOptions, create_new_migration, list_migrations, make_migrations,
@@ -82,6 +84,148 @@ pub fn handle_migration_new(
         output_dir: None,
     };
     create_new_migration(&path, &name, options).with_context(|| "unable to create migration")
+}
+
+macro_rules! project_file {
+    ($name:literal) => {
+        ($name, include_str!(concat!("project_template/", $name)))
+    };
+}
+
+pub fn handle_make_model(
+    model_args: ModelArgs,
+) -> anyhow::Result<()> {
+
+    // if no name specified, exit
+    let model_name = model_args.name;
+    // default to not create controller
+    let create_controller = model_args.create_controller.unwrap_or(true);
+
+    // TODO: get root directory of cot project
+    let destination_models_dir = PathBuf::from("./src/models");
+    let destination_controllers_dir = PathBuf::from("./src/controllers");
+
+    let models_mod_path = destination_models_dir.join("mod.rs");
+    let model_file_path = destination_models_dir.join(format!("{model_name}.rs"));
+
+    // create models dir if missing
+    let _r = std::fs::create_dir_all(&destination_models_dir).unwrap();
+
+    // check if models mod rs exists and creates it if needed
+    if !std::fs::exists(&models_mod_path).unwrap_or(false) {
+        trace!("src/models/mod.rs does not exist; creating now");
+        let _r = std::fs::write(destination_models_dir.join("mod.rs"), "");
+    }
+
+    // check if this specific model file exists
+    if std::fs::exists(&model_file_path).unwrap_or(false) {
+        anyhow::bail!("File models/{}.rs already exists for model {}", model_name, model_name)
+    }
+
+    // create model file from template
+    let (_filename, content) = project_file!("src/models/model.rs");
+
+    trace!("Writing file: {:?}", model_file_path);
+    let _r = std::fs::write(
+        model_file_path,
+        content
+            .replace("{{ model_name }}", model_name.as_str())
+    ).unwrap();
+
+    // check if model is already in mod.rs (it shouldn't be, but let's be safe)
+    let file_handle = std::fs::File::open(&models_mod_path).unwrap();
+    let reader = std::io::BufReader::new(file_handle);
+
+    let is_model_in_modrs = reader.lines().any(|line| {
+        line.map(|l| l.contains(&model_name)).unwrap_or(false)
+    });
+
+    // write to mod.rs file with the model name
+    if !is_model_in_modrs {
+        trace!("Adding model {} to src/models/mod.rs", model_name);
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(&models_mod_path)?;
+
+        writeln!(file, "pub mod {};", model_name)?;
+    }
+
+    if create_controller {
+        let controller_args = ControllerArgs {
+            model_name: model_name,
+            name: None
+        };
+        let r = handle_make_controller(controller_args);
+        return r;
+    }
+
+    Ok(())
+}
+
+pub fn handle_make_controller(
+    controller_args: ControllerArgs,
+) -> anyhow::Result<()> {
+    // this function is pretty much lifted from the handle_make_model right above
+
+    let model_name = controller_args.model_name;
+    let controller_name = match controller_args.name {
+        Some(name) => {name}
+        None => {format!("{model_name}_controller")}
+    };
+
+    // TODO: get root directory of cot project
+    let destination_controllers_dir = PathBuf::from("./src/controllers");
+
+    let controllers_mod_path = destination_controllers_dir.join("mod.rs");
+    let controller_file_path = destination_controllers_dir.join(format!("{controller_name}.rs"));
+
+    // create models dir if missing
+    let _r = std::fs::create_dir_all(&destination_controllers_dir).unwrap();
+
+    // check if models mod rs exists and creates it if needed
+    if !std::fs::exists(&controllers_mod_path).unwrap_or(false) {
+        trace!("src/controllers/mod.rs does not exist; creating now");
+        let _r = std::fs::write(&controllers_mod_path, "");
+    }
+
+    // check if this specific controller file exists to not overwrite it
+    if std::fs::exists(&controller_file_path).unwrap_or(false) {
+        anyhow::bail!("File controllers/{}.rs already exists for controller {}", controller_name, controller_name);
+    }
+
+    // create controller file from template
+    let (_filename, content) = project_file!("src/controllers/model_controller.rs");
+
+    trace!("Writing file: {:?}", controller_file_path);
+    let _r = std::fs::write(
+        controller_file_path,
+        content
+            .replace("{{ model_name }}", &model_name.as_str())
+    ).unwrap();
+
+    // check if controller is already in mod.rs (it shouldn't be, but let's be safe)
+    let file_handle = std::fs::File::open(&controllers_mod_path).unwrap();
+    let reader = std::io::BufReader::new(file_handle);
+
+    let is_model_in_modrs = reader.lines().any(|line| {
+        line.map(|l| l.contains(&controller_name)).unwrap_or(false)
+    });
+
+    // write to mod.rs file with the controller name
+    if !is_model_in_modrs {
+        trace!("Adding controller {} to src/controllers/mod.rs", controller_name);
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(&controllers_mod_path)?;
+
+        writeln!(file, "pub mod {};", controller_name)?;
+    }
+
+    Ok(())
 }
 
 pub fn handle_cli_manpages(

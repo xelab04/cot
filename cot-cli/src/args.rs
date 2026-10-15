@@ -49,6 +49,10 @@ pub enum Commands {
     #[command(subcommand)]
     Cli(CliCommands),
 
+    /// Make controllers and models from CLI
+    #[command(subcommand)]
+    Make(MakeCommands),
+
     #[command(external_subcommand)]
     External(Vec<OsString>),
 }
@@ -127,6 +131,30 @@ pub enum CliCommands {
     Manpages(ManpagesArgs),
     /// Generate completions for the Cot CLI
     Completions(CompletionsArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ModelArgs {
+    /// Name of model to be created
+    pub name: String,
+    /// Whether to create the controller
+    pub create_controller: Option<bool>,
+}
+
+#[derive(Debug, Args)]
+pub struct ControllerArgs {
+    /// Specify the model to use
+    pub model_name: String,
+    /// Optional name of controller to be created
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum MakeCommands {
+    /// Create a model struct in the models dir
+    Model(ModelArgs),
+    /// Create a controller in the controllers dir
+    Controller(ControllerArgs),
 }
 
 #[derive(Debug, Args)]

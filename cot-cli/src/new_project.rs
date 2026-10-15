@@ -12,7 +12,7 @@ macro_rules! project_file {
     };
 }
 
-const PROJECT_FILES: [(&str, &str); 10] = [
+const PROJECT_FILES: [(&str, &str); 12] = [
     project_file!("Cargo.toml.template"),
     project_file!("Cargo.lock.template"),
     project_file!("bacon.toml"),
@@ -23,6 +23,8 @@ const PROJECT_FILES: [(&str, &str); 10] = [
     project_file!("templates/index.html"),
     project_file!("config/dev.toml"),
     project_file!("config/prod.toml.example"),
+    project_file!("src/models/mod.rs"),
+    project_file!("src/controllers/mod.rs"),
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

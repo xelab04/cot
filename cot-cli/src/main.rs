@@ -4,8 +4,8 @@ use std::ffi::OsString;
 
 use clap::Parser;
 use cot_cli::args::{
-    BUILD_FLAG, Cli, CliCommands, Commands, HELP_LONG_FLAG, HELP_SHORT_FLAG, MigrationCommands,
-    PACKAGE_LONG_FLAG, PACKAGE_SHORT_FLAG, RELEASE_FLAG, extract_package_arg,
+    BUILD_FLAG, Cli, CliCommands, MakeCommands, Commands, HELP_LONG_FLAG, HELP_SHORT_FLAG,
+    MigrationCommands, PACKAGE_LONG_FLAG, PACKAGE_SHORT_FLAG, RELEASE_FLAG, extract_package_arg,
 };
 use cot_cli::{handlers, project};
 use tracing_subscriber::util::SubscriberInitExt;
@@ -113,6 +113,10 @@ fn main() -> anyhow::Result<()> {
                 handlers::handle_external(&path, &remaining, project, release)
             }
         },
+        Commands::Make(cmd) => match cmd {
+            MakeCommands::Model(args) => handlers::handle_make_model(args),
+            MakeCommands::Controller(args) => handlers::handle_make_controller(args),
+        }
         Commands::External(args) => {
             let project = project::load(
                 &std::env::current_dir()?,
