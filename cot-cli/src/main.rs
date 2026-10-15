@@ -4,7 +4,7 @@ use std::ffi::OsString;
 
 use clap::Parser;
 use cot_cli::args::{
-    BUILD_FLAG, Cli, CliCommands, MakeCommands, Commands, HELP_LONG_FLAG, HELP_SHORT_FLAG,
+    BUILD_FLAG, Cli, CliCommands, MakeCommands, ToolCommands, Commands, HELP_LONG_FLAG, HELP_SHORT_FLAG,
     MigrationCommands, PACKAGE_LONG_FLAG, PACKAGE_SHORT_FLAG, RELEASE_FLAG, extract_package_arg,
 };
 use cot_cli::{handlers, project};
@@ -117,6 +117,9 @@ fn main() -> anyhow::Result<()> {
             MakeCommands::Model(args) => handlers::handle_make_model(args),
             MakeCommands::Controller(args) => handlers::handle_make_controller(args),
         }
+        Commands::Tools(cmd) => match cmd {
+            ToolCommands::Keygen(args) => handlers::handle_keygen(args),
+        },
         Commands::External(args) => {
             let project = project::load(
                 &std::env::current_dir()?,
